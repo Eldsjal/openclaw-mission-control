@@ -32,9 +32,18 @@ def _normalize_database_url(database_url: str) -> str:
     return database_url
 
 
+def _connect_args() -> dict:
+    """Build connect_args, including search_path if DB_SCHEMA is set."""
+    schema = settings.db_schema.strip()
+    if schema:
+        return {"options": f"-csearch_path={schema},public"}
+    return {}
+
+
 async_engine: AsyncEngine = create_async_engine(
     _normalize_database_url(settings.database_url),
     pool_pre_ping=True,
+    connect_args=_connect_args(),
 )
 async_session_maker = async_sessionmaker(
     async_engine,

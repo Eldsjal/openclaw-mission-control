@@ -57,18 +57,31 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def _connect_args() -> dict:
+    """Build connect_args, including search_path if DB_SCHEMA is set."""
+    schema = getattr(settings, "db_schema", "").strip()
+    if schema:
+        return {"options": f"-csearch_path={schema},public"}
+    return {}
+
+
 def run_migrations_online() -> None:
     """Run migrations in online mode using a live DB connection."""
-    configuration = config.get_section(config.config_ini_section) or {}
-    configuration["sqlalchemy.url"] = get_url()
+    from sqlalchemy import create_engine, text
 
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    engine = create_engine(
+        get_url(),
         poolclass=pool.NullPool,
+        connect_args=_connect_args(),
     )
 
-    with connectable.connect() as connection:
+    with engine.connect() as connection:
+        # Ensure the target schema exists before running migrations.
+        schema = getattr(settings, "db_schema", "").strip()
+        if schema:
+            connection.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+            connection.commit()
+
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
