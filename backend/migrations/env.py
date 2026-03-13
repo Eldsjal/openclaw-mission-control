@@ -44,6 +44,14 @@ def get_url() -> str:
 config.set_main_option("sqlalchemy.url", get_url())
 
 
+def _version_table_kwargs() -> dict:
+    """Return version_table_schema kwarg if DB_SCHEMA is set."""
+    schema = getattr(settings, "db_schema", "").strip()
+    if schema:
+        return {"version_table_schema": schema}
+    return {}
+
+
 def run_migrations_offline() -> None:
     """Run migrations in offline mode without DB engine connectivity."""
     context.configure(
@@ -51,6 +59,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,
+        **_version_table_kwargs(),
     )
 
     with context.begin_transaction():
@@ -86,6 +95,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
+            **_version_table_kwargs(),
         )
 
         with context.begin_transaction():
