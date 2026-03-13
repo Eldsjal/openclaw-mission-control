@@ -72,6 +72,7 @@ class Settings(BaseSettings):
 
     # Database lifecycle
     db_auto_migrate: bool = False
+    db_schema: str = ""
 
     # RQ queueing / dispatch
     rq_redis_url: str = "redis://localhost:6379/0"
