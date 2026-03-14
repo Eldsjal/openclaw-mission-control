@@ -44,6 +44,14 @@ def get_url() -> str:
 config.set_main_option("sqlalchemy.url", get_url())
 
 
+def _version_table_kwargs() -> dict:
+    """Return version_table_schema kwarg if DB_SCHEMA is set."""
+    schema = getattr(settings, "db_schema", "").strip()
+    if schema:
+        return {"version_table_schema": schema}
+    return {}
+
+
 def run_migrations_offline() -> None:
     """Run migrations in offline mode without DB engine connectivity."""
     context.configure(
@@ -51,28 +59,43 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,
+        **_version_table_kwargs(),
     )
 
     with context.begin_transaction():
         context.run_migrations()
 
 
+def _connect_args() -> dict:
+    """Build connect_args, including search_path if DB_SCHEMA is set."""
+    schema = getattr(settings, "db_schema", "").strip()
+    if schema:
+        return {"options": f"-csearch_path={schema},public"}
+    return {}
+
+
 def run_migrations_online() -> None:
     """Run migrations in online mode using a live DB connection."""
-    configuration = config.get_section(config.config_ini_section) or {}
-    configuration["sqlalchemy.url"] = get_url()
+    from sqlalchemy import create_engine, text
 
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    engine = create_engine(
+        get_url(),
         poolclass=pool.NullPool,
+        connect_args=_connect_args(),
     )
 
-    with connectable.connect() as connection:
+    with engine.connect() as connection:
+        # Ensure the target schema exists before running migrations.
+        schema = getattr(settings, "db_schema", "").strip()
+        if schema:
+            connection.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+            connection.commit()
+
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
+            **_version_table_kwargs(),
         )
 
         with context.begin_transaction():

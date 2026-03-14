@@ -32,9 +32,18 @@ def _normalize_database_url(database_url: str) -> str:
     return database_url
 
 
+def _connect_args() -> dict:
+    """Build connect_args, including search_path if DB_SCHEMA is set."""
+    schema = settings.db_schema.strip()
+    if schema:
+        return {"options": f"-csearch_path={schema},public"}
+    return {}
+
+
 async_engine: AsyncEngine = create_async_engine(
     _normalize_database_url(settings.database_url),
     pool_pre_ping=True,
+    connect_args=_connect_args(),
 )
 async_session_maker = async_sessionmaker(
     async_engine,
@@ -61,8 +70,22 @@ def run_migrations() -> None:
     logger.info("Database migrations complete.")
 
 
+async def _ensure_schema() -> None:
+    """Create the target schema if DB_SCHEMA is set and it doesn't exist."""
+    schema = settings.db_schema.strip()
+    if not schema:
+        return
+    from sqlalchemy import text
+
+    async with async_engine.connect() as conn:
+        await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+        await conn.commit()
+    logger.info("db.schema.ensured schema=%s", schema)
+
+
 async def init_db() -> None:
     """Initialize database schema, running migrations when configured."""
+    await _ensure_schema()
     if settings.db_auto_migrate:
         versions_dir = Path(__file__).resolve().parents[2] / "migrations" / "versions"
         if any(versions_dir.glob("*.py")):
