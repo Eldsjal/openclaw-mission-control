@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from alembic.config import Config
 from sqlalchemy.exc import SQLAlchemyError
@@ -32,7 +32,7 @@ def _normalize_database_url(database_url: str) -> str:
     return database_url
 
 
-def _connect_args() -> dict:
+def _connect_args() -> dict[str, Any]:
     """Build connect_args, including search_path if DB_SCHEMA is set."""
     schema = settings.db_schema.strip()
     if schema:
